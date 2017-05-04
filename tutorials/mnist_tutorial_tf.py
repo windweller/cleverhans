@@ -13,11 +13,12 @@ from tensorflow.python.platform import flags
 from cleverhans.utils_mnist import data_mnist
 from cleverhans.utils_tf import model_train, model_eval, batch_eval
 from cleverhans.attacks import fgsm
-from cleverhans.utils import cnn_model
+from cleverhans.utils import cnn_model, regression_model
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('nb_epochs', 6, 'Number of epochs to train model')
+# flags.DEFINE_integer('nb_epochs', 6, 'Number of epochs to train model')
+flags.DEFINE_integer('nb_epochs', 10, 'Number of epochs to train model')
 flags.DEFINE_integer('batch_size', 128, 'Size of training batches')
 flags.DEFINE_float('learning_rate', 0.1, 'Learning rate for training')
 
@@ -48,7 +49,7 @@ def main(argv=None):
     # Get MNIST test data
     X_train, Y_train, X_test, Y_test = data_mnist()
 
-    assert Y_train.shape[1] == 10.
+    # assert Y_train.shape[1] == 10.
     label_smooth = .1
     Y_train = Y_train.clip(label_smooth / 9., 1. - label_smooth)
 
@@ -57,7 +58,8 @@ def main(argv=None):
     y = tf.placeholder(tf.float32, shape=(None, 10))
 
     # Define TF model graph
-    model = cnn_model()
+    # model = cnn_model()
+    model = regression_model()
     predictions = model(x)
     print("Defined TensorFlow model graph.")
 
@@ -75,6 +77,7 @@ def main(argv=None):
         'batch_size': FLAGS.batch_size,
         'learning_rate': FLAGS.learning_rate
     }
+
     model_train(sess, x, y, predictions, X_train, Y_train,
                 evaluate=evaluate, args=train_params)
 
@@ -91,9 +94,12 @@ def main(argv=None):
 
     print("Repeating the process, using adversarial training")
     # Redefine TF model graph
-    model_2 = cnn_model()
+    # model_2 = cnn_model()
+    # model_2 = regression_model()
+    model_2 = model
     predictions_2 = model_2(x)
-    adv_x_2 = fgsm(x, predictions_2, eps=0.3)
+    # adv_x_2 = fgsm(x, predictions_2, eps=0.3)
+    adv_x_2 = adv_x
     predictions_2_adv = model_2(adv_x_2)
 
     def evaluate_2():
@@ -111,10 +117,21 @@ def main(argv=None):
         print('Test accuracy on adversarial examples: ' + str(accuracy_adv))
 
     # Perform adversarial training
+    train_params['nb_epochs'] = 30
     model_train(sess, x, y, predictions_2, X_train, Y_train,
                 predictions_adv=predictions_2_adv, evaluate=evaluate_2,
                 args=train_params)
 
+    # after adversarial training:
+    # Test accuracy on legitimate test examples: 0.9483
+    # Test accuracy on adversarial examples: 0.8989
+
+    # we test on previously generated adversarial example
+    # Test accuracy on adversarial examples: 0.1844
+    accuracy = model_eval(sess, x, y, predictions_2, X_test_adv, Y_test,
+                          args=eval_params)
+
+    print('Test accuracy on adversarial examples: ' + str(accuracy))
 
 if __name__ == '__main__':
     app.run()

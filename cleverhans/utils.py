@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 from distutils.version import LooseVersion
 import keras
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Dense, Dropout, Activation, Flatten, Reshape
 import matplotlib.pyplot as plt
 import os
 
@@ -139,6 +139,25 @@ def conv_2d(filters, kernel_shape, strides, padding):
     else:
         return Convolution2D(filters, kernel_shape[0], kernel_shape[1],
                              subsample=strides, border_mode=padding)
+
+
+def regression_model(logits=False, input_ph=None, img_rows=28, img_cols=28, channels=1, nb_classes=10):
+    input_shape = (img_rows, img_cols, channels)
+    model = Sequential()
+    layers = [Flatten(input_shape=input_shape),
+              Dense(units=200, activation="tanh"), Dense(nb_classes)]
+
+    for layer in layers:
+        model.add(layer)
+
+    if logits:
+        logits_tensor = model(input_ph)
+    model.add(Activation('softmax'))
+
+    if logits:
+        return model, logits_tensor
+    else:
+        return model
 
 
 def cnn_model(logits=False, input_ph=None, img_rows=28, img_cols=28,
